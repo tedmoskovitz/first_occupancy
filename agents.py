@@ -314,3 +314,114 @@ class SR(object):
 
         return next_action
 
+
+
+class SARSA(object):
+
+    def __init__(
+        self,
+        number_of_states: int,
+        number_of_actions: int,
+        initial_state: int,
+        policy: Callable = None,
+        q: np.ndarray = None,
+        step_size: float = 0.1,
+        epsilon: float = 0.01,
+        beta: float = 100.0,
+        eta: float = 0.01,
+        gamma_sfr: float = 0.95,
+        use_sr: bool = False,
+        use_fr: bool = False,
+        norm: Callable = L1
+        ):
+        """
+        tabular on-policy control
+        args:
+            number_of_states: number of states
+            number_of_actions: number of actions
+            initial_state: the starting position in the environment (2D position)
+            policy: a function relating q-values to actions; if none is provided, default to a random policy
+            q: a q function
+            step_size: the learning rate 
+            epsilon: noise factor for epsilon-greedy exploration
+            beta: coefficient for reward bonus
+            eta: learning rate for SR/FR
+            gamma_sfr: discount factor for SR/FR 
+            use_sr: use SR exploration bonus 
+            use_fr: use FR exploration bonus 
+            norm: norm for exploration bonus
+        """
+        self._q = np.random.uniform(size=[number_of_states, number_of_actions]) if q is None else q
+        self._M = np.zeros([number_of_states, number_of_states])
+        self._F = np.eye(number_of_states) # FR
+        self._state = initial_state
+        self._number_of_actions = number_of_actions
+        self._number_of_states = number_of_states
+        self._step_size = step_size
+        self._initial_state = initial_state 
+        self._policy = policy 
+        self._action = 1
+        self._epsilon = epsilon
+        self._beta = beta
+        self._eta = eta
+        self._gamma_sfr = gamma_sfr
+        self._use_sr = use_sr
+        self._use_fr = use_fr
+        self._norm = norm
+
+    @property
+    def state_values(self):
+        return np.max(self._q, axis=1)
+
+    @property
+    def q_values(self):
+        return self._q
+
+    @property
+    def SR(self):
+        return self._M
+
+    @property
+    def FR(self):
+        return self._F
+
+    def step(self, reward, discount, next_state):
+
+        # act epsilon-greedily wrt current q values
+        next_action = epsilon_greedy(self._q[next_state, :], epsilon=self._epsilon)
+
+        # update state representation(s)
+        if self._use_sr: # SR
+            one_hot = np.eye(self._number_of_states)
+            # compute SR update
+            target_sr = one_hot[self._state] + self._gamma_sfr * self._M[next_state, :]
+            delta_sr = target_sr - self._M[self._state, :]
+            self._M += self._eta * delta_sr
+            # augment reward with SR exploration bonus
+            sr_exploration_bonus = self._beta / self._norm(self._M[self._state, :])
+            reward += sr_exploration_bonus
+
+        if self._use_fr: # FR
+            # compute FR update
+            target_fr = self._gamma_sfr * self._F[next_state, :]
+            delta_fr = target_fr - self._F[self._state]
+            delta_fr[self._state] = 0
+            self._F += self._eta * delta_fr
+            # augment reward with FR exploration bonus
+            reward += self._beta * self._norm(self._F[next_state, :])
+
+        # compute SARSA error
+        target = reward + discount * self._q[next_state, next_action]
+        delta = target - self._q[self._state, self._action]
+        # apply update 
+        self._q[self._state, self._action] += self._step_size * delta
+
+
+        # reset current state 
+        self._state = next_state
+        self._action = next_action
+        
+
+        return next_action
+
+
