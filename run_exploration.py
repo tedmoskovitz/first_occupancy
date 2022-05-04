@@ -16,7 +16,7 @@ def main():
     parser.add_argument('--env', type=str, default='riverswim')
     parser.add_argument('--seed', type=int, default=100)
     parser.add_argument('--save', action='store_true', default=False)
-    parser.add_argument('--n_runs', type=int, default=100)
+    parser.add_argument('--n_runs', type=int, default=10)
     parser.add_argument('--total_steps', type=int, default=5000)
     parser.add_argument('--use_fr', action='store_true', default=False)
     parser.add_argument('--use_sr', action='store_true', default=False)
