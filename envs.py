@@ -766,3 +766,78 @@ class BasicGrid(object):
         axs[2].plot([x+0.5, x+0.5], [-0.5, h-0.5], '-k', lw=2)
 
 
+class RiverSwim(object):
+    
+    def __init__(self):
+        
+        self._num_actions = 2
+        self._num_states = 6
+        self._start_state = np.random.choice([1, 2], p=[0.5, 0.5])
+        self._state = self._start_state
+        
+        # define transition matrices for each state, |A|(2) x |S|(6)
+        # first row is action = 0 (left), second is action = 1 (right)
+        Ps0 = np.array([
+            [1.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            [0.7, 0.3, 0.0, 0.0, 0.0, 0.0]
+        ]) # from state 0, if you go left, you stay in state 0, if you go right, you escape 
+        # with 30% probability 
+        Ps1 = np.array([
+            [1.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            [0.1, 0.6, 0.3, 0.0, 0.0, 0.0],
+        ])
+        Ps2 = np.array([
+            [0.0, 1.0, 0.0, 0.0, 0.0, 0.0],
+            [0.0, 0.1, 0.2, 0.7, 0.0, 0.0]
+        ])
+        Ps3 = np.array([
+            [0.0, 0.0, 1.0, 0.0, 0.0, 0.0],
+            [0.0, 0.0, 0.1, 0.6, 0.3, 0.0]
+        ])
+        Ps4 = np.array([
+            [0.0, 0.0, 0.0, 1.0, 0.0, 0.0],
+            [0.0, 0.0, 0.0, 0.1, 0.6, 0.3]
+        ])
+        Ps5 = np.array([
+            [0.0, 0.0, 0.0, 0.0, 1.0, 0.0],
+            [0.0, 0.0, 0.0, 0.0, 0.4, 0.6]
+        ])
+        self.P = np.stack([Ps0, Ps1, Ps2, Ps3, Ps4, Ps5]) # |S| x |A| x |S'|
+        
+        # reward function r(s, a, s')
+        self.r = np.zeros([self._num_states, self._num_actions, self._num_states])
+        self.r[0, 0, 0] = 5
+        self.r[5, 1, 5] = 1e4
+        self.discount = 0.95
+        self.S = np.arange(self._num_states)
+    
+    def get_obs(self, s=None):
+        return s if s is not None else self._state
+    
+    @property
+    def size(self):
+        return self._num_states
+    
+    def obs_to_state(self, obs):
+        return obs
+    
+    def reset(self):
+        self._state = np.random.choice([1, 2], p=[0.5, 0.5])
+        
+        return 0, self.discount, self.get_obs(), False
+    
+    def step(self, action):
+        assert action in [0, 1], "invalid action"
+        
+        done = False
+        # get (s, a) -> s' transition probs
+        transition_probs = self.P[self._state, action, :] # |S'| vector
+        # get next state
+        next_state = np.random.choice(self.S, p=transition_probs)
+        # get reward
+        reward = self.r[self._state, action, next_state]
+        # reset state
+        self._state = next_state
+        
+        return reward, self.discount, self.get_obs(), done
+        
